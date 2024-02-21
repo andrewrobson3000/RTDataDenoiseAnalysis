@@ -1,0 +1,444 @@
+\documentclass[a4paper,11pt]{article}
+\usepackage[margin=3cm]{geometry}
+\usepackage{hyperref}
+\usepackage{enumerate}
+\usepackage{float}
+
+\floatplacement{figure}{H}
+\newcommand{\code}[1]{\texttt{#1}}
+
+\author{P328}
+\title{MSc Statistical Programming assessed practical}
+
+\begin{document}
+
+\maketitle
+
+\subsection*{Rotten tomatoes}
+
+
+\begin{enumerate}
+
+\item Throughout this question, data from the Rotten tomatoes movie rankings website, which contains movie ratings data, will be analysed to study various aspects of this dataset. A movie is categorised as fresh if at least 60 percent of the reviews are positive. By contrast, movies are classed as rotten if less than 60 percent of the reviews are positive. First, the percentage of movies rated fresh per year are shown from the year 2000 onwards (Fig.1). An upward trend in amount of movies that were rated fresh is shown. Given that, movies have remained the same quality since 2000 these data suggest that movie critics are being more generous in their overall ratings of movies since 2000. 
+The graph entitled, percent of movies rated fresh per month (Fig.2) shows an upward trend in the percent of movies rated fresh as the months progress throughout the year. The month with the highest overall rating was November with over 67 percent of movies rated fresh, closely followed by December with over 66 percent of the movies rated fresh. By contrast, both January and February had less than 62 percent of movies rated fresh. The data imply that movie critics tend to be more generous as the year progresses. Finally, examination of the percent of movies rated fresh throughout the month (Fig.3) ranges from a 65 percent maximum average rating to a minimum rating of around 60 percent Although, the 60 percent, seems fairly low compared with the next lowest value of over 62.5 percent. No obvious trend is observed in the plot throughout the month. 
+<<r, echo = FALSE, warning=FALSE, message=FALSE>>=
+
+library("knitr")
+library("ggplot2")
+library("magrittr")
+library("tidyverse")
+library("stringr")
+library("dplyr")
+library("readr")
+library("data.table")
+library("png")
+library("testthat")
+options(kable_view_html = F)
+
+#setwd("C:/Users//HP/Desktop/Practical")
+
+reviews <- read.csv(file = 'rotten_tomatoes_critic_reviews.csv', header=T, 
+                    na.strings=c("","NA"))
+reviews$year <- as.numeric(format(as.Date(reviews$review_date),  "%Y"))
+reviews$month <- as.numeric(format(as.Date(reviews$review_date),  "%m"))
+reviews$day <- as.numeric(format(as.Date(reviews$review_date),  "%d"))
+@
+
+<<Q1a, echo = FALSE,  warning=FALSE, message=FALSE, fig.cap="Percent of movies that are rated fresh per year", fig.height=4.5,fig.align = 'right', hold="h">>=
+# Plot the percent of movies that are rated fresh per year
+reviews %>% 
+  # Do not plot results for years before the year 2000
+  filter(year>=2000) %>%
+  group_by(year) %>%
+  # Calculate percent of movies that are rated fresh per year
+  summarize(pct_Y = 100 * sum(review_type == "Fresh")/length(review_type)) %>%
+  ggplot(aes(x = year, y=pct_Y)) + geom_point() +
+  labs(x ="Year", y = "Percent of 'fresh' movies") +
+  geom_point(colour = "red", size = 3) +
+  theme(plot.title = element_text(hjust = 0.5), axis.title = element_text(size=16))
+@
+
+<<Q1b, echo = FALSE, fig.cap="Percent of movies that are rated fresh per month", fig.height=4.5,fig.align = 'right', hold="h">>=
+# Plot the percent of movies that are rated fresh per month
+defaultW <- getOption("warn") 
+options(warn = -1) 
+reviews %>% 
+  filter(year>=2000) %>%
+  group_by(month) %>%
+  summarize(pct_m = 100 * sum(review_type == "Fresh")/length(review_type)) %>%
+  ggplot(aes(x = month, y=pct_m)) + geom_point() +
+  labs(x ="Month", y = "Percent of 'fresh' movies") +
+  geom_point(colour = "red", size = 3) +
+  scale_x_discrete(limits = 1:12, labels = month.abb) +
+  theme(plot.title = element_text(hjust = 0.5), axis.title = element_text(size=16))
+options(warn = defaultW)
+@
+
+<<Q1c, echo = FALSE, warning="FALSE", fig.cap="Percent of movies that are rated fresh per day", fig.height=4.5,fig.align = 'right', hold="h">>=
+# Plot the percent of movies that are rated fresh per day
+defaultW <- getOption("warn") 
+options(warn = -1) 
+reviews %>% 
+  filter(year>=2000) %>%
+  group_by(day) %>%
+  summarize(pct_d = 100 * sum(review_type == "Fresh")/length(review_type)) %>%
+  ggplot(aes(x = day, y=pct_d)) + geom_point() +
+  labs(x ="Day", y = "Percent of 'fresh' movies") +
+  theme(plot.title = element_text(hjust = 0.5), axis.title = element_text(size=16)) +
+  geom_point(colour = "red", size = 3)
+options(warn = defaultW)
+@
+
+\item The next aim was to investigate whether differences exist between men and women in the Rotten tomatoes movie dataset, with a particular emphasis on the amount of fresh reviews. The following table shows that overall, men have reviewed more movies (827111) than women (192724) in the Rotten tomatoes movie dataset.
+\begin{enumerate}[i]
+
+  
+<<2a, echo = FALSE, warning=FALSE, message=FALSE>>=
+# Assess whether gender plays a role in how critics rate movies, and
+# how this changes through time. Read in the file nam dict.txt
+
+nam_dict <- read_fwf("nam_dict.txt", skip = 362, 
+                     locale = locale(encoding= "latin1"), show_col_types = FALSE)
+
+
+#Check if any NA values
+#any(is.na(nam_dict))
+
+#Keep the columns of interest and rename them
+gender_names <- nam_dict %>% 
+  select(1:2)
+names(gender_names) <- c("Gender", "Name")
+
+#Keeping only names in nam dict.txt that either "M" or "F"
+gender_names2 <- gender_names %>%
+  filter(str_detect(Gender, "F|M")) %>%
+  filter(!str_detect(Gender, fixed("?"))) %>%
+           filter(!str_detect(Gender, fixed("1")))
+
+#assign every critic first name as being male or female. 
+# Need to match the two tables based on critics' names
+
+# Explore if NA and remove rows if NA in critic_name column
+#any(is.na(reviews$critic_name)) #TRUE
+#any(is.na(gender_names2)) #FALSE
+
+# remove NAs and keep columns of interest
+reviews2<- reviews %>% 
+  filter(!is.na(critic_name)) %>%
+  select(rotten_tomatoes_link, critic_name, review_type, year)
+
+reviews2$Name <- word(reviews2$critic_name, 1)
+
+#assign every critic first name as being male or female, by joining the two tables
+joined4 <- reviews2 %>% 
+  left_join(gender_names2, by="Name") %>%
+  drop_na(Gender)
+@
+ 
+  \item
+
+<<Q2b, echo = FALSE, warning=FALSE, message=FALSE,  hold="h">>=
+# Who has reviewed more films, men or women?
+mostreviewed <- joined4 %>% group_by(Gender) %>% tally()
+kable(mostreviewed)
+@
+ 
+  \item Here, I plotted the percentage of movies that are rated fresh per year between men and women. The table shows that men gave more fresh movie reviews than women since the year 2000.
+  
+<<Q2c, echo = FALSE, warning=FALSE>>=
+#Since and including the year 2000, are men or women more likely to give movies "fresh" reviews?
+mostreviewed2000 <- joined4 %>%
+  filter(year>=2000 & review_type == "Fresh") %>%  
+  group_by(review_type, Gender) %>%
+  tally()
+kable(mostreviewed2000)
+@
+
+  \item Here, I plotted a graph to show the percentage of movie reviews submitted by each gender per year since and including the year 2000 (Fig.4). The red bars show the percentage of reviews submitted by females per year since 2000 (compared with males). Overall, men submitted more movie reviews than women and this difference in the percentage of women submitting reviews since 2000 compared with males has remained fairly constant. In addition I plotted the percentage of reviews rated fresh per year between men and women (Fig.5). Although in the year 2000, males submitted a higher proportion of fresh reviews compared with females, however after the year 2000, females submitted a higher percentage of fresh reviews per year than men. Furthermore, we can observe that this difference in the percentage between males and females seems to be slowly increasing in the last decade.
+
+
+<<Q2d, echo = FALSE, warning=FALSE, message=FALSE, fig.cap=c("The percent of reviews per year per gender", "The percent of movies that are rated fresh per year between men and women"), fig.height=4.5>>=
+
+#To further investigate this, make a plot that visualizes what percentage of reviews are
+#submitted by female reviewers per year since and including the year 2000. 
+joined4 %>%
+  filter(year>=2000) %>% 
+  count(year, Gender = factor(Gender))  %>%
+  group_by(year) %>%
+  mutate(n = prop.table(n) * 100) %>%
+  ggplot(aes(x = year, y=n, fill = Gender)) + geom_col(position="dodge") +
+  labs(x ="Year", y = "Percent of reviews by gender") 
+
+#Further, for both males and females, plot the percent of movies that are rated fresh per year
+#since and including the year 2000.
+joined4 %>%
+  filter(year>=2000) %>%  
+  group_by(year, Gender) %>%
+  summarize(pct_f = 100 * sum(review_type == "Fresh")/length(review_type)) %>%
+  ggplot(aes(x = year, y=pct_f, fill= Gender)) + geom_col(position="dodge") + labs(x ="Year", y = "Percent of 'fresh' movies")
+@ 
+ \end{enumerate}
+  
+\item Here, I sought to assess whether people with names that are more or less common in one country gave more or less favourable reviews.
+\begin{enumerate}[i]
+\item First, I wrote a function called get-countries that takes the file path to the namdict.txt and returns a vector with the countries from the txt file. The vector, that starts with GreatBritain and ends with othercountries has 55 entries (table not shown in PDF).
+
+<<Q3a, echo = FALSE, warning=FALSE, message=FALSE>>=
+ 
+get_countries <- function (filepath) {
+  
+  nam_dict_countries <- read_fwf(filepath, 
+                                 skip=177,
+                                 locale = locale(encoding= "latin1"),
+                                 skip_empty_rows = TRUE,
+                                 trim_ws = TRUE,
+                                 show_col_types = FALSE)
+  
+  countries <- nam_dict_countries[1:163,1]
+  
+  countries1 <- data.frame(lapply(countries, function(x) {
+    gsub("#", "", x)
+  }))
+  
+  countries2 <- countries1 %>%
+    mutate(across(where(is.character), ~ na_if(.,""))) %>%
+    na.omit() %>%
+    filter(if_any(everything(), ~ !grepl("\\|", .)))
+  
+  countries3 <- gsub('\\s+', '', countries2$X1)  #55 countries
+
+  return(countries3) #returns vector with the countries
+  
+}
+
+countries_names <- get_countries("nam_dict.txt") 
+@
+
+
+  \item I wrote the get-most-common-country-per-name function, that takes all the available names from namdict.txt and eventually returns a dataframe with the names column and next to it a column with the country where each name is most popular. The name Aadje is most commonly found in East Frisia.
+
+<<Q3b, echo = FALSE, warning=FALSE, message=FALSE>>=
+
+get_most_common_country_per_name <- function(pathToFile){
+  nam1 <- readr::read_fwf(file = pathToFile,
+                          fwf_widths(c(3, 26, rep(1, 55))),
+                          locale = locale(encoding= "latin1"),
+                          comment = "#"
+                          )
+  nam1 <- nam1[nam1[, 3] != "-" & nam1[ ,3] != "+" | is.na(nam1[, 3]), ]
+  # Add countries names from previous question as column names
+  colnames <- names(nam1)
+  colnames[1:2] <- c("Gender", "Name")
+  colnames[3:57] <- countries_names
+  names(nam1) <- colnames
+  
+  # Replace NA values with zeros for calculations. 
+  # Find the column name with the highest value per row
+  # In case of tie keep first column name
+  most_freq_name <- nam1 %>%
+    mutate_all(funs(ifelse(is.na(.), 0, .))) %>%
+    select(3:57) %>%
+    mutate_all(., function(x) as.numeric(as.character(x))) %>%
+    rowwise() %>%
+    mutate(max = names(.)[which.max(c_across(everything()))])
+  
+  res <- cbind(nam1[,2], most_freq_name$max)
+  colnames2 <- names(res)
+  colnames2 <- c("Name", "Country where most frequent")
+  names(res) <- colnames2
+  
+  return(res)
+  }
+
+commonNameTable <- get_most_common_country_per_name("nam_dict.txt")
+
+@
+ 
+  \item I first created a table using the Rotten tomatoes data and the above function, which contained the country where the first name of each reviewer, for each review, is most popular (table not shown in PDF). I then used the table mentioned, to find what percentage of reviews for each country were fresh or rotten, only showing countries with at least 5000 reviews. The country with the most favourable reviews is Bulgaria with 74.7 percent fresh reviews, whereas Vietnam had 60.7 percent making it the least favourable country (in terms of review types).
+
+<<Q3c, echo = FALSE, warning=FALSE, message=FALSE>>=
+
+joined5 <- joined4 %>% 
+  left_join(commonNameTable, by="Name") %>%
+  select(c(1,2,5,7))
+
+# Calculate, for each country, what percent of reviews with names associated from that
+# country were fresh or rotten. 
+# Present your results in a table, only showing countries with at least 5000 reviews
+reviews_per_country <- joined4 %>% 
+  left_join(commonNameTable, by="Name") %>%
+  count(`Country where most frequent`, review_type = factor(review_type)) %>%
+  group_by(`Country where most frequent`) %>%
+  mutate(pct = paste0(round(prop.table(n) * 100, 1), "%")) %>%
+  filter(n>=5000)
+
+#Reviews written by people with names associated with which country are
+# the most favourable, and the least favourable?
+res1 <- reviews_per_country %>%
+  rename(`Review type` = review_type)%>%
+  filter(`Review type`== "Fresh") %>%
+  group_by(`Review type`) %>%
+  arrange(pct)
+kable(res1)
+@ 
+\end{enumerate} 
+  \end{enumerate}
+  
+
+\subsection*{Message from deep space}
+
+\begin{enumerate}
+\item The aim of the second part of this coursework was to denoise an image from a space craft that has taken an image from deep space, which unfortunately due to the nature of transmission of the data to the earth, the resulting signal has been corrupted. First, the PNG image was loaded into R and as shown below it is impossible to decipher the message in the image.
+
+<<Q1, echo = FALSE, warning=FALSE, message=FALSE, fig.height=4.5>>=
+
+A <- png::readPNG("./mystery.png")[, , 1:3]
+
+#png::writePNG(A, file = "./oxfordout.png")
+
+grid::grid.raster(A)
+@
+
+\item Here, a function was written that takes pairs of points, finds those that have the closest RGB values based on L2-norm and calculates their average RGB value. 
+
+<<Q2, echo = TRUE, warning=FALSE, message=FALSE>>=
+
+alg1int <- function(A, w1rows, w2cols){
+  
+  # For each row and column given, 
+  # get each point's 3D coordinates [i,j,k] and store them in a list.
+  points <- list()
+  rows = length(w1rows)
+  cols = length(w2cols)
+  for (i in 1:rows) {
+    for (j in 1:cols) {
+      points[[((i-1)*cols+j)]] = A[w1rows[i], w2cols[j], 1:3]
+    }
+  }
+  
+  # Go through all points, using the l2-norm find those points 
+  # with the closest distance. 
+  min_dist <- Inf
+  index1 <- 0
+  index2 <- 0
+  n <- rows * cols
+  for (i in 1:n) {
+    for (j in 1:n) {
+      if (i!=j) {
+        dist = sqrt(sum( (points[[i]]-points[[j]])^2 ))
+        if (dist < min_dist) {
+          min_dist <- dist
+          index1 <- i
+          index2 <- j
+        }
+      }
+    }
+  }
+  
+  # Calculate the average RGB value 
+  # of the closest points identified above
+  avg = (points[[index1]] + points[[index2]])/2
+  return(avg)
+}
+
+@
+
+
+\item A unittest was designed to test whether the alg1int function can indeed calculate the average RGB value for 2 points. Two closest points were selected at random to test this. 
+
+<<Q3, echo = TRUE, warning=FALSE>>=
+
+test_that("Find the average RGB values for 2 closest points", {
+  
+  # Set two random closest points
+  A1 <- A[3, 6, 1:3]
+  A2 <- A[4, 6, 1:3]
+ 
+  # Calculate the average
+  expected_output <- (A1+A2)/2
+  
+  func_result <- alg1int(A, 3:4, 6)
+  # Compare if results equal
+  expect_equal(func_result, expected_output)
+  
+})
+@
+
+
+\item Finally, the full algorithm was implemented that takes the noisy 3d RGB image as an input and a smoothing filter of a specific width (w) and uses the alig1int function to calculate the average RGB of the closest pixels and therefore perform the smoothing. It does that for all the rows and columns across the whole 3D image. 
+<<Q4, echo = TRUE, warning=FALSE, message=FALSE>>=
+
+algorithm1 <- function(A, w){
+  
+  numrows <- nrow(A)
+  numcols <- ncol(A)
+  
+  # Create empty 3D array for smoothed image
+  B <- array(0,dim=c(numrows, numcols, 3))
+  
+  # For each iteration, identify the rows of the input image within 
+  # distance w of i
+  for(i in 1:numrows){
+    
+    w1_start <- i-w+1
+    if(w1_start < 1){
+      w1_start <- 1
+    }
+    
+    w1_end <- i+w-1
+    if(w1_end > numrows){
+      w1_end <- numrows
+    }
+    
+    # Get the range of rows to use
+    w1 <- (w1_start : w1_end)
+    
+    # For each iteration, identify the columns of the input image 
+    # within distance w of j
+    for(j in 1:ncol(A)){
+      w2_start <- j-w+1
+      if(w2_start < 1){
+        w2_start <- 1
+      }
+
+      w2_end <- j+w-1
+      if(w2_end > numrows){
+        w2_end <- numrows
+      }
+      
+      # Get the range of columns to use
+      w2 <- (w2_start : w2_end)
+      
+      # Use the alg1int function from the previous step
+      res <- alg1int(A, w1, w2)
+      
+      # Populate the empty array with the new values 
+      # for the denoised image
+      B[i, j, 1:3] <- res
+    }
+  }
+  return(B)
+}
+
+
+@
+
+\item The computational complexity of the `alg1int` function is \( O(n^2) \), where \( n \) is the product of the number of rows and columns within the selected window, and is thus dependent on the window size \( W \). This complexity arises from the nested loops used to compute the L2 norm between points in the `alg1int` function. In the broader `algorithm1` function, which applies `alg1int` across the entire 3D array, this complexity is further amplified. Specifically, since `algorithm1` iterates over each pixel in the \( N \times N \) array and applies the `alg1int` function with a \( W \times W \) window at each iteration, the overall computational complexity escalates to \( O(N^2 \cdot W^4) \). This results from the combination of iterating over each element in the \( N \times N \) array and the \( W^4 \) complexity of the `alg1int` function at each step, particularly in the worst-case scenario where both the rows and columns influenced by the window size are approximately \( W \). Thus, it's crucial to recognize that the computational demand of this algorithm scales significantly with both the size of the input array and the chosen window size \( W \).
+
+
+\item Finally, as requested I apply algorithm1 to mystery.png with w=5 to reveal the hidden message, STATS RULES 2022.
+
+
+<<Q6, echo = FALSE, warning=FALSE, message=FALSE, fig.height=4.5, hold="h">>=
+
+smoothed <- algorithm1(A, 5)
+
+png::writePNG(smoothed, "./oxfordout.png")
+
+grid::grid.raster(smoothed)
+
+@
+
+\end{enumerate}
+
+\end{document}

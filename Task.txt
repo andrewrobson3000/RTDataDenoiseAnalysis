@@ -1,0 +1,23 @@
+# Statistical Analysis and Image Denoising Project
+
+## Overview
+
+This project was conceived as a blend of data analysis and image processing, aimed at leveraging statistical programming to extract meaningful insights from Rotten Tomatoes movie ratings and to improve the quality of noisy images through a sophisticated denoising algorithm. The dual objectives were to understand the dynamics of film criticism over time and to explore practical applications of image processing techniques in enhancing visual data.
+
+## Objectives
+
+- **Data Analysis of Rotten Tomatoes Ratings:** To analyze a dataset of movie ratings from Rotten Tomatoes, aiming to identify trends, biases, and patterns in film criticism. The analysis focused on understanding how movies have been rated over the years, with a particular interest in changes in rating patterns that could reflect shifts in critical evaluation or movie quality.
+
+- **Image Denoising:** To apply a denoising algorithm on a set of noisy images, with the goal of recovering the original, uncorrupted content. This part of the project explored statistical and computational methods to enhance the clarity and quality of images that have been degraded by various forms of noise.
+
+## Methodology
+
+- **Rotten Tomatoes Data Analysis:** Utilized R programming to read, process, and analyze the dataset. Techniques included data visualization to plot trends over time and statistical analysis to interpret the data. The analysis provided insights into the evolution of movie ratings and potential seasonal or temporal biases in film criticism.
+
+- **Image Denoising Algorithm:** Developed and implemented a denoising algorithm that processes noisy images to reduce or eliminate the impact of noise, thereby recovering the underlying image. The algorithm was tested on a set of images, demonstrating its effectiveness in enhancing image quality.
+
+## Results and Conclusion
+
+The project successfully uncovered interesting trends in Rotten Tomatoes movie ratings, suggesting shifts in critical evaluation over time. Additionally, the image denoising component demonstrated the potential of statistical programming techniques in practical applications, significantly improving the quality of noisy images.
+
+This project highlights the versatility of statistical programming in addressing diverse challenges, from data analysis to image processing, showcasing the power of combining analytical techniques with practical problem-solving.
